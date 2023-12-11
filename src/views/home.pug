@@ -6,8 +6,14 @@ html(lang="en")
     title Loom
     link(rel="stylesheet", href="https://unpkg.com/mvp.css")
   body 
-    header 
-      h1 Loom 
-    main 
-      h2 Welcome to Noom 
-    script(src="/public/js/app.js")
+      header
+          h1 Loom
+      main
+          form#nick
+              input(type="text", placeholder="choose a nickname", required)
+              button Save
+          ul 
+          form#message
+              input(type="text", placeholder="write a msg", required)
+              button Send
+      script(src="/public/js/app.js") 
