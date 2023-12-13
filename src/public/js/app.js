@@ -2,15 +2,51 @@ const socket = io(); // io function은 알아서 socket.io를 실행하고 있�
 
 const welcome = document.getElementById("welcome");
 const form = welcome.querySelector("form");
+const room = document.getElementById("room");
 
+room.hidden = true;
 
-function backendDone(msg) {
-  console.log(`The backend says: `, msg);
+let roomName;
+
+function addMessage(message){
+  const ul=room.querySelector("ul");
+  const li=document.createElement("li");
+  li.innerText=message;
+  ul.appendChild(li);
+}
+function handleMessageSubmit(event){
+  event.preventDefault();
+  const input=room.querySelector("input");
+  const value=input.value;
+  socket.emit("new_message",input.value, roomName, ()=>{
+    addMessage(`You: ${value}`);
+  });
+  input.value="";
+}
+
+function showRoom() {
+  welcome.hidden = true;
+  room.hidden = false;
+  const h3= room.querySelector("h3");
+  h3.innerText=`Room ${roomName}`;
+  const form=room.querySelector("form");
+  form.addEventListener("submit", handleMessageSubmit);
 }
 function handleRoomSubmit(event) {
   event.preventDefault();
   const input = form.querySelector("input");
-  socket.emit("enter_room", { payload: input.value }, backendDone); // "message"와 같이 정해진 event가 아니라, 이름 막 정해서 넘겨도 되는 custom event임
-  input.value = ""; // (윗줄주석임) 프론트엔드에서 object를 전송할 수 있음
+  socket.emit("enter_room", input.value, showRoom);
+  roomName=input.value;
+  input.value = "";
 }
 form.addEventListener("submit", handleRoomSubmit);
+
+socket.on("welcome", ()=>{
+  addMessage("someone joined!");
+});
+
+socket.on("bye", ()=>{
+  addMessage("someone left ㅠㅠ");
+});
+
+socket.on("new_message", addMessage);

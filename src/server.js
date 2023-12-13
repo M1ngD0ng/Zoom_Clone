@@ -19,11 +19,20 @@ const httpServer = http.createServer(app); // views, static files, home, redirec
 // http 위에 웹소켓을 놓은것
 const wsServer=SocketIO(httpServer);
 wsServer.on("connection",socket =>{
-  socket.on("enter_room", (roomName,done)=>{
-    console.log(roomName);
-    setTimeout(()=>{ // done 함수-> 백엔드에서 호출하지만 프론트엔드에서 실행됨
-      done("hello from the backend");
-    }, 15000);
+  socket.onAny((event)=>{
+    console.log(`Socket Event: ${event}`);
+  });
+  socket.on("enter_room", (roomName,done)=>{ 
+    socket.join(roomName); 
+    done();
+    socket.to(roomName).emit("welcome");
+  });
+  socket.on("disconnecting", ()=>{
+    socket.rooms.forEach(room => socket.to(room).emit("bye"));
+  });
+  socket.on("new_message", (msg,room,done)=>{
+    socket.to(room).emit("new_message",msg);
+    done();
   });
 });
 
