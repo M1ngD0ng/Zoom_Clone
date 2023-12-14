@@ -1,6 +1,8 @@
 import http from "http";
-import SocketIO from "socket.io";
+import {Server} from "socket.io";
+import { instrument } from "@socket.io/admin-ui";
 import express from "express";
+
 
 const app = express();
 
@@ -17,22 +19,57 @@ const httpServer = http.createServer(app); // views, static files, home, redirec
 // 두 서버를 한 포트(3000)에 두려고 이런식으로 만드는 것. ws만 사용해도 됨
 //const wss = new WebSocket.Server({ server }); // 이렇게하면 http, websocket서버를 둘 다 돌릴 수 있음
 // http 위에 웹소켓을 놓은것
-const wsServer=SocketIO(httpServer);
-wsServer.on("connection",socket =>{
-  socket.onAny((event)=>{
+
+
+const wsServer = new Server(httpServer, {
+  cors:{
+    origin: ["http://admin.socket.io"],
+    credentials: true,
+  },
+});
+instrument(wsServer,{
+  auth: false
+});
+
+function publicRooms() {
+  const {
+    sockets: {
+      adapter: { sids, rooms },
+    },
+  } = wsServer;
+  const publicRooms = [];
+  rooms.forEach((_, key) => {
+    if (sids.get(key) === undefined) {
+      publicRooms.push(key);
+    }
+  });
+  return publicRooms;
+}
+
+function countRoom(roomName) {
+  return wsServer.sockets.adapter.rooms.get(roomName)?.size;
+}
+wsServer.on("connection", socket => {
+  socket["nickname"] = "Anon";
+  socket.onAny((event) => {
     console.log(`Socket Event: ${event}`);
   });
-  socket.on("enter_room", (roomName,done)=>{ 
-    socket.join(roomName); 
+  socket.on("enter_room", (roomName, done) => {
+    socket.join(roomName);
     done();
-    socket.to(roomName).emit("welcome");
+    socket.to(roomName).emit("welcome", socket.nickname, countRoom(roomName));
+    wsServer.sockets.emit("room_change", publicRooms());
   });
-  socket.on("disconnecting", ()=>{
-    socket.rooms.forEach(room => socket.to(room).emit("bye"));
+  socket.on("disconnecting", () => {
+    socket.rooms.forEach((room) => socket.to(room).emit("bye", socket.nickname, countRoom(room) - 1));
   });
-  socket.on("new_message", (msg,room,done)=>{
-    socket.to(room).emit("new_message",msg);
+  wsServer.sockets.emit("room_change", publicRooms());
+  socket.on("new_message", (msg, room, done) => {
+    socket.to(room).emit("new_message", `${socket.nickname}: ${msg}`);
     done();
+  });
+  socket.on("nickname", nickname => {
+    socket["nickname"] = nickname;
   });
 });
 
